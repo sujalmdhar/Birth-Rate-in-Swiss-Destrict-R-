@@ -1,0 +1,205 @@
+---
+title: "Birthrates in Swiss Districts"
+author: "Sujal Manandhar"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+# Install and load the plgraphics package
+```{r}
+library(plgraphics)
+library(ggplot2)
+library(reshape2)
+```
+
+### Load data
+```{r}
+data = read.csv("swiss.csv")
+data
+```
+```{r}
+num_rows <- nrow(data)
+num_column <- ncol(data)
+print(num_rows)
+print(num_column)
+```
+
+# Load the dataset
+```{r}
+data("d.birthrates")
+```
+
+
+### Data Cleaning and Preprocessing 
+
+# Check for missing values
+```{r}
+missing_values <- colSums(is.na(d.birthrates))
+print("Missing Values:")
+print(missing_values)
+```
+
+### Exploratory Data Analysis (EDA)
+
+# View the first few rows of the dataset
+```{r}
+head(d.birthrates)
+```
+
+# View the last few rows of the dataset
+```{r}
+tail(d.birthrates)
+```
+
+# Summary Statistics
+
+Task: Start by examining summary statistics of the dataset to understand the distribution and range of each variable.
+
+```{r}
+# Assuming d.birthrates is your dataframe
+plot(d.birthrates$fertility, type = "o", xlab = "Row Number", ylab = "Fertility", main = "Fertility Over Rows")
+```
+
+Correlation Analysis
+
+Task: Calculate the correlation matrix to identify relationships between variables.
+
+```{r}
+# Calculate correlation matrix
+correlation_matrix <- cor(d.birthrates[, c("fertility", "infantMort", "catholic", "single24", "single49")])
+
+# Convert correlation matrix to long format for plotting
+correlation_long <- melt(as.matrix(correlation_matrix))
+
+# Plot heatmap with correlation values inside boxes
+ggplot(correlation_long, aes(Var1, Var2, fill=value, label=round(value, 2))) +
+  geom_tile(color="white") +
+  scale_fill_gradient2(low="blue", high="red", mid="white", 
+                       midpoint=0, limit=c(-1,1), space="Lab", 
+                       name="Correlation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, size = 12, hjust = 1)) +
+  geom_text(color="black", size=3) +
+  coord_fixed()
+```
+
+# Visualization
+
+Task: Create scatterplot matrices, boxplots, barplots, and histograms to visualize the relationships between variables and explore distributions.
+
+# Scatterplot Matrix
+
+```{r}
+pairs(~fertility + infantMort + catholic + single24 + single49, data=d.birthrates, main="Scatterplot Matrix")
+```
+
+# Boxplot of fertility by language
+
+```{r}
+boxplot(fertility ~ language, data=d.birthrates, main="Fertility by Dominating Language", xlab="Language", ylab="Fertility")
+```
+
+
+# # Barplot of percentage of Catholic by altitude category
+
+```{r}
+barplot(tapply(d.birthrates$catholic, d.birthrates$altitude, mean), 
+        main="Percentage of Catholic by Altitude Category",
+        xlab="Altitude Category",
+        ylab="Percentage Catholic")
+```
+
+
+# # Histogram of infant mortality
+
+```{r}
+hist(d.birthrates$infantMort, main="Histogram of Infant Mortality", xlab="Infant Mortality")
+```
+
+# Plot fertility against other variables
+```{r}
+par(mfrow=c(2,2))
+plot(d.birthrates$fertility, d.birthrates$infantMort, xlab="Fertility", ylab="Infant Mortality", main="Fertility vs Infant Mortality")
+plot(d.birthrates$fertility, d.birthrates$catholic, xlab="Fertility", ylab="Percentage Catholic", main="Fertility vs Percentage Catholic")
+plot(d.birthrates$fertility, d.birthrates$single24, xlab="Fertility", ylab="Percentage Single (20-24)", main="Fertility vs Percentage Single (20-24)")
+plot(d.birthrates$fertility, d.birthrates$single49, xlab="Fertility", ylab="Percentage Single (45-49)", main="Fertility vs Percentage Single (45-49)")
+```
+
+
+### Linear Regression
+
+```{r}
+library(caret)
+library(lattice)
+library(performance)
+```
+
+```{r}
+# Split the data into training and testing sets
+set.seed(123) # For reproducibility
+train_index <- createDataPartition(d.birthrates$fertility, p = 0.8, list = FALSE)
+train_data <- d.birthrates[train_index, ]
+test_data <- d.birthrates[-train_index, ]
+
+# Fit your model (e.g., linear regression)
+model <- lm(fertility ~ infantMort + catholic + single24 + single49, data=d.birthrates)
+
+# Check the fitted model
+print(model)
+
+# Check for influential points (Cook's distance plot)
+cooksd <- cooks.distance(model)
+plot(cooksd, pch = "*", cex = 1, main = "Influential Points by Cook's distance")
+abline(h = 4*mean(cooksd, na.rm = TRUE), col = "red")  # Highlighting cutoff for influential points
+```
+
+```{r}
+# 1. Residuals vs Fitted: Checking for homoscedasticity
+plot(model, which = 1)
+
+# 2. Normal Q-Q plot: Checking for normality of residuals
+plot(model, which = 2)
+
+# 3. Scale-Location plot: Another check for homoscedasticity
+plot(model, which = 3)
+
+# 4. Cook's distance plot: Identifying influential points
+plot(model, which = 4)
+```
+
+
+
+### Evaluation
+
+# Calculate MSE
+
+```{r}
+predicted <- predict(model, newdata=test_data)
+mse <- mean((test_data$fertility - predicted)^2)
+print(paste("Mean Squared Error (MSE):", mse))
+```
+
+# Visualize Results
+
+```{r}
+plot(test_data$fertility, predicted, main = "Actual vs Predicted Fertility", xlab = "Actual Fertility", ylab = "Predicted Fertility")
+abline(0, 1, col = "red")
+
+# Add MSE to the plot
+legend("topleft", legend = paste("MSE:", round(mse, 2)), bty = "n")
+```
+
+# Summary of the model
+
+```{r}
+# Extract coefficients from the linear regression model
+coefficients <- coef(model)[-1]  # Exclude intercept
+
+# Plot coefficients
+barplot(coefficients, main="Coefficients of Linear Regression Model", 
+        ylab="Coefficient Value", names.arg=names(coefficients))
+```
+
+
+
